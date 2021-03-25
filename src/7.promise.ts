@@ -4,7 +4,7 @@
  * @Author: power_840
  * @Date: 2021-03-25 20:10:54
  * @LastEditors: power_840
- * @LastEditTime: 2021-03-25 22:43:44
+ * @LastEditTime: 2021-03-25 21:37:49
  */
 // promise解决的问题
 // 1. 异步并发问题
@@ -26,50 +26,6 @@ const enum STATUS {
   pending = "PENDING",
   fulfilled = "FULFILLED",
   rejected = "REJECTED",
-}
-
-function resolvePromise(promise2, x, resolve, reject) {
-  console.log(promise2, x, resolve, reject);
-  if (promise2 == x) {
-    return reject(new TypeError("类型错误"));
-  }
-  if ((typeof x === "object" && x !== null) || typeof x === "function") {
-    // 通过called确保只能调用一次
-    let called = false;
-    try {
-      const then = x.then;
-      if (typeof then === "function") {
-        then.call(
-          x,
-          (y) => {
-            if (called) {
-              return;
-            }
-            called = true;
-            // resolve(y);
-            // y也有可能是个promise, y需要递归处理
-            resolvePromise(promise2, y, resolve, reject);
-          },
-          (r) => {
-            if (called) {
-              return;
-            }
-            called = true;
-            // 只要失败就直接抛出, 不需要进行额外处理
-            reject(r);
-          }
-        );
-      }
-    } catch (error) {
-      if (called) {
-        return;
-      }
-      called = true;
-      reject(error);
-    }
-  } else {
-    resolve(x);
-  }
 }
 
 class Promise {
@@ -104,51 +60,38 @@ class Promise {
   then(onFulfilled, onRejected) {
     let promise2 = new Promise((reslove, reject) => {
       if (this.status === STATUS.fulfilled) {
-        setTimeout(() => {
-          try {
-            let x = onFulfilled(this.value);
-            resolvePromise(promise2, x, reslove, reject);
-            // reslove(x);
-          } catch (error) {
-            reject(error);
-          }
-        }, 0);
+        try {
+          let x = onFulfilled(this.value);
+          reslove(x);
+        } catch (error) {
+          reject(error);
+        }
       }
       if (this.status === STATUS.rejected) {
-        setTimeout(() => {
-          try {
-            // NOTE: 失败的时候也是返回给下个promise的then
-            let x = onRejected(this.reason);
-            resolvePromise(promise2, x, reslove, reject);
-            // reslove(x);
-          } catch (error) {
-            reject(error);
-          }
-        }, 0);
+        try {
+          // NOTE: 失败的时候也是返回给下个promise的then
+          let x = onRejected(this.reason);
+          reslove(x);
+        } catch (error) {
+          reject(error);
+        }
       }
       if (this.status === STATUS.pending) {
         this.onResolvedCallbacks.push(() => {
-          setTimeout(() => {
-            try {
-              let x = onFulfilled(this.value);
-
-              resolvePromise(promise2, x, reslove, reject);
-              // reslove(x);
-            } catch (error) {
-              reject(error);
-            }
-          }, 0);
+          try {
+            let x = onFulfilled(this.value);
+            reslove(x);
+          } catch (error) {
+            reject(error);
+          }
         });
         this.onRejectedCallbacks.push(() => {
-          setTimeout(() => {
-            try {
-              let x = onRejected(this.reason);
-              resolvePromise(promise2, x, reslove, reject);
-              // reslove(x);
-            } catch (error) {
-              reject(error);
-            }
-          }, 0);
+          try {
+            let x = onRejected(this.reason);
+            reslove(x);
+          } catch (error) {
+            reject(error);
+          }
         });
       }
     });
