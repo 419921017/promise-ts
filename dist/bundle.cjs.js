@@ -11,17 +11,18 @@
 // promise解决的问题
 // 1. 异步并发问题
 // 2. 异步嵌套问题, 回调地狱, 回调函数
+// 兼容别人的promise
 function resolvePromise(promise2, x, resolve, reject) {
-    console.log(promise2, x, resolve, reject);
     if (promise2 == x) {
-        return reject(new TypeError("类型错误"));
+        return reject(new TypeError('类型错误'));
     }
-    if ((typeof x === "object" && x !== null) || typeof x === "function") {
-        // 通过called确保只能调用一次
+    if ((typeof x === 'object' && x !== null) || typeof x === 'function') {
+        // 通过called确保只能调用一次, 状态一旦发生改变, 不能修改, 直接返回
         var called_1 = false;
         try {
+            // 这里的promise可能是别人实现的promise
             var then = x.then;
-            if (typeof then === "function") {
+            if (typeof then === 'function') {
                 then.call(x, function (y) {
                     if (called_1) {
                         return;
@@ -38,6 +39,10 @@ function resolvePromise(promise2, x, resolve, reject) {
                     // 只要失败就直接抛出, 不需要进行额外处理
                     reject(r);
                 });
+            }
+            else {
+                // 普通对象处理
+                resolve(x);
             }
         }
         catch (error) {
@@ -83,13 +88,23 @@ var Promise$1 = /** @class */ (function () {
     }
     Promise.prototype.then = function (onFulfilled, onRejected) {
         var _this = this;
-        var promise2 = new Promise(function (reslove, reject) {
+        // 如果onFulfilled不是函数, 将值传递给下个
+        onFulfilled =
+            typeof onFulfilled === 'function' ? onFulfilled : function (val) { return val; };
+        // 如果onRejected不是函数, 将错误传递给下个
+        onRejected =
+            typeof onRejected === 'function'
+                ? onRejected
+                : function (err) {
+                    throw err;
+                };
+        var promise2 = new Promise(function (resolve, reject) {
             if (_this.status === "FULFILLED" /* fulfilled */) {
                 setTimeout(function () {
                     try {
                         var x = onFulfilled(_this.value);
-                        resolvePromise(promise2, x, reslove, reject);
-                        // reslove(x);
+                        resolvePromise(promise2, x, resolve, reject);
+                        // resolve(x);
                     }
                     catch (error) {
                         reject(error);
@@ -101,8 +116,8 @@ var Promise$1 = /** @class */ (function () {
                     try {
                         // NOTE: 失败的时候也是返回给下个promise的then
                         var x = onRejected(_this.reason);
-                        resolvePromise(promise2, x, reslove, reject);
-                        // reslove(x);
+                        resolvePromise(promise2, x, resolve, reject);
+                        // resolve(x);
                     }
                     catch (error) {
                         reject(error);
@@ -114,8 +129,8 @@ var Promise$1 = /** @class */ (function () {
                     setTimeout(function () {
                         try {
                             var x = onFulfilled(_this.value);
-                            resolvePromise(promise2, x, reslove, reject);
-                            // reslove(x);
+                            resolvePromise(promise2, x, resolve, reject);
+                            // resolve(x);
                         }
                         catch (error) {
                             reject(error);
@@ -126,8 +141,8 @@ var Promise$1 = /** @class */ (function () {
                     setTimeout(function () {
                         try {
                             var x = onRejected(_this.reason);
-                            resolvePromise(promise2, x, reslove, reject);
-                            // reslove(x);
+                            resolvePromise(promise2, x, resolve, reject);
+                            // resolve(x);
                         }
                         catch (error) {
                             reject(error);
@@ -138,7 +153,52 @@ var Promise$1 = /** @class */ (function () {
         });
         return promise2;
     };
+    Promise.prototype.catch = function (onRejected) {
+        return this.then(null, onRejected);
+    };
     return Promise;
 }());
+function isPromise(val) {
+    if (val &&
+        ((typeof val === 'object' && val !== null) || typeof val === 'function') &&
+        typeof val.then === 'function') {
+        return true;
+    }
+    return false;
+}
+Promise$1.all = function (values) {
+    return new Promise$1(function (resolve, reject) {
+        var timers = 0;
+        var arr = [];
+        function changeArr(value, key) {
+            arr[key] = value;
+            if (++timers === values.length) {
+                resolve(arr);
+            }
+        }
+        var _loop_1 = function (i) {
+            var value = values[i];
+            if (isPromise(value)) {
+                value.then(function (data) {
+                    changeArr(data, i);
+                }, reject);
+            }
+            else {
+                changeArr(value, i);
+            }
+        };
+        for (var i = 0; i < values.length; i++) {
+            _loop_1(i);
+        }
+    });
+};
+Promise$1.deferred = function () {
+    var dfd = {};
+    dfd.promise = new Promise$1(function (resolve, reject) {
+        dfd.resolve = resolve;
+        dfd.reject = reject;
+    });
+    return dfd;
+};
 
 module.exports = Promise$1;

@@ -23,22 +23,23 @@
 // let newPromise = new Promise((resolve, reject) => {});
 
 const enum STATUS {
-  pending = "PENDING",
-  fulfilled = "FULFILLED",
-  rejected = "REJECTED",
+  pending = 'PENDING',
+  fulfilled = 'FULFILLED',
+  rejected = 'REJECTED',
 }
-
+// 兼容别人的promise
 function resolvePromise(promise2, x, resolve, reject) {
   console.log(promise2, x, resolve, reject);
   if (promise2 == x) {
-    return reject(new TypeError("类型错误"));
+    return reject(new TypeError('类型错误'));
   }
-  if ((typeof x === "object" && x !== null) || typeof x === "function") {
-    // 通过called确保只能调用一次
+  if ((typeof x === 'object' && x !== null) || typeof x === 'function') {
+    // 通过called确保只能调用一次, 状态一旦发生改变, 不能修改
     let called = false;
     try {
+      // 这里的promise可能是别人实现的promise
       const then = x.then;
-      if (typeof then === "function") {
+      if (typeof then === 'function') {
         then.call(
           x,
           (y) => {
@@ -101,14 +102,14 @@ class Promise {
       reject(error);
     }
   }
-  then(onFulfilled, onRejected) {
-    let promise2 = new Promise((reslove, reject) => {
+  then(onFulfilled?, onRejected?) {
+    let promise2 = new Promise((resolve, reject) => {
       if (this.status === STATUS.fulfilled) {
         setTimeout(() => {
           try {
             let x = onFulfilled(this.value);
-            resolvePromise(promise2, x, reslove, reject);
-            // reslove(x);
+            resolvePromise(promise2, x, resolve, reject);
+            // resolve(x);
           } catch (error) {
             reject(error);
           }
@@ -119,8 +120,8 @@ class Promise {
           try {
             // NOTE: 失败的时候也是返回给下个promise的then
             let x = onRejected(this.reason);
-            resolvePromise(promise2, x, reslove, reject);
-            // reslove(x);
+            resolvePromise(promise2, x, resolve, reject);
+            // resolve(x);
           } catch (error) {
             reject(error);
           }
@@ -131,9 +132,8 @@ class Promise {
           setTimeout(() => {
             try {
               let x = onFulfilled(this.value);
-
-              resolvePromise(promise2, x, reslove, reject);
-              // reslove(x);
+              resolvePromise(promise2, x, resolve, reject);
+              // resolve(x);
             } catch (error) {
               reject(error);
             }
@@ -143,8 +143,8 @@ class Promise {
           setTimeout(() => {
             try {
               let x = onRejected(this.reason);
-              resolvePromise(promise2, x, reslove, reject);
-              // reslove(x);
+              resolvePromise(promise2, x, resolve, reject);
+              // resolve(x);
             } catch (error) {
               reject(error);
             }

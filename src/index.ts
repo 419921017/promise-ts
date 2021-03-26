@@ -23,22 +23,22 @@
 // let newPromise = new Promise((resolve, reject) => {});
 
 const enum STATUS {
-  pending = "PENDING",
-  fulfilled = "FULFILLED",
-  rejected = "REJECTED",
+  pending = 'PENDING',
+  fulfilled = 'FULFILLED',
+  rejected = 'REJECTED',
 }
-
+// 兼容别人的promise
 function resolvePromise(promise2, x, resolve, reject) {
-  console.log(promise2, x, resolve, reject);
   if (promise2 == x) {
-    return reject(new TypeError("类型错误"));
+    return reject(new TypeError('类型错误'));
   }
-  if ((typeof x === "object" && x !== null) || typeof x === "function") {
-    // 通过called确保只能调用一次
+  if ((typeof x === 'object' && x !== null) || typeof x === 'function') {
+    // 通过called确保只能调用一次, 状态一旦发生改变, 不能修改, 直接返回
     let called = false;
     try {
+      // 这里的promise可能是别人实现的promise
       const then = x.then;
-      if (typeof then === "function") {
+      if (typeof then === 'function') {
         then.call(
           x,
           (y) => {
@@ -59,6 +59,9 @@ function resolvePromise(promise2, x, resolve, reject) {
             reject(r);
           }
         );
+      } else {
+        // 普通对象处理
+        resolve(x);
       }
     } catch (error) {
       if (called) {
@@ -73,6 +76,8 @@ function resolvePromise(promise2, x, resolve, reject) {
 }
 
 class Promise {
+  static deferred;
+  static all;
   public status: STATUS;
   public value: any = undefined;
   public reason: any = undefined;
@@ -101,14 +106,24 @@ class Promise {
       reject(error);
     }
   }
-  then(onFulfilled, onRejected) {
-    let promise2 = new Promise((reslove, reject) => {
+  then(onFulfilled?, onRejected?) {
+    // 如果onFulfilled不是函数, 将值传递给下个
+    onFulfilled =
+      typeof onFulfilled === 'function' ? onFulfilled : (val) => val;
+    // 如果onRejected不是函数, 将错误传递给下个
+    onRejected =
+      typeof onRejected === 'function'
+        ? onRejected
+        : (err) => {
+            throw err;
+          };
+    let promise2 = new Promise((resolve, reject) => {
       if (this.status === STATUS.fulfilled) {
         setTimeout(() => {
           try {
             let x = onFulfilled(this.value);
-            resolvePromise(promise2, x, reslove, reject);
-            // reslove(x);
+            resolvePromise(promise2, x, resolve, reject);
+            // resolve(x);
           } catch (error) {
             reject(error);
           }
@@ -119,8 +134,8 @@ class Promise {
           try {
             // NOTE: 失败的时候也是返回给下个promise的then
             let x = onRejected(this.reason);
-            resolvePromise(promise2, x, reslove, reject);
-            // reslove(x);
+            resolvePromise(promise2, x, resolve, reject);
+            // resolve(x);
           } catch (error) {
             reject(error);
           }
@@ -131,9 +146,8 @@ class Promise {
           setTimeout(() => {
             try {
               let x = onFulfilled(this.value);
-
-              resolvePromise(promise2, x, reslove, reject);
-              // reslove(x);
+              resolvePromise(promise2, x, resolve, reject);
+              // resolve(x);
             } catch (error) {
               reject(error);
             }
@@ -143,8 +157,8 @@ class Promise {
           setTimeout(() => {
             try {
               let x = onRejected(this.reason);
-              resolvePromise(promise2, x, reslove, reject);
-              // reslove(x);
+              resolvePromise(promise2, x, resolve, reject);
+              // resolve(x);
             } catch (error) {
               reject(error);
             }
@@ -154,6 +168,52 @@ class Promise {
     });
     return promise2;
   }
+  catch(onRejected) {
+    return this.then(null, onRejected);
+  }
 }
+
+function isPromise(val) {
+  if (
+    val &&
+    ((typeof val === 'object' && val !== null) || typeof val === 'function') &&
+    typeof val.then === 'function'
+  ) {
+    return true;
+  }
+  return false;
+}
+
+Promise.all = function (values) {
+  return new Promise((resolve, reject) => {
+    let timers = 0;
+    let arr = [];
+    function changeArr(value, key) {
+      arr[key] = value;
+      if (++timers === values.length) {
+        resolve(arr);
+      }
+    }
+    for (let i = 0; i < values.length; i++) {
+      const value = values[i];
+      if (isPromise(value)) {
+        value.then((data) => {
+          changeArr(data, i);
+        }, reject);
+      } else {
+        changeArr(value, i);
+      }
+    }
+  });
+};
+
+Promise.deferred = function () {
+  let dfd = {} as any;
+  dfd.promise = new Promise((resolve, reject) => {
+    dfd.resolve = resolve;
+    dfd.reject = reject;
+  });
+  return dfd;
+};
 
 export default Promise;
