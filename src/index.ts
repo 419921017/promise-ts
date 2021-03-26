@@ -77,7 +77,6 @@ function resolvePromise(promise2, x, resolve, reject) {
 
 class Promise {
   static deferred;
-  static all;
   public status: STATUS;
   public value: any = undefined;
   public reason: any = undefined;
@@ -87,6 +86,10 @@ class Promise {
     this.status = STATUS.pending;
     const resolve = (value: any) => {
       if (this.status === STATUS.pending) {
+        // 需要考虑传入的value是promise的情况
+        if (value instanceof Promise) {
+          return value.then(resolve, reject);
+        }
         this.status = STATUS.fulfilled;
         this.value = value;
         this.onResolvedCallbacks.forEach((fn) => fn());
@@ -171,6 +174,62 @@ class Promise {
   catch(onRejected) {
     return this.then(null, onRejected);
   }
+  // finally的结果不会影响后续结果
+  // 无论成功和失败都要执行的逻辑(callback)
+  // finally传给后续的then的值是上一次值接受的值
+  // 成功直接传递给下一个resolve
+  // 失败也是直接传递给下一个reject
+  finally(callback) {
+    return this.then(
+      (value) => Promise.resolve(callback()).then(() => value),
+      (err) =>
+        Promise.resolve(callback()).then(() => {
+          throw err;
+        })
+    );
+  }
+  static resolve(value?) {
+    return new Promise((resolve, _) => {
+      resolve(value);
+    });
+  }
+  static reject(reason?) {
+    return new Promise((_, reject) => {
+      reject(reason);
+    });
+  }
+  static all(values) {
+    return new Promise((resolve, reject) => {
+      let timers = 0;
+      let arr = [];
+      function changeArr(value, key) {
+        arr[key] = value;
+        if (++timers === values.length) {
+          resolve(arr);
+        }
+      }
+      for (let i = 0; i < values.length; i++) {
+        const value = values[i];
+        if (isPromise(value)) {
+          value.then((data) => {
+            changeArr(data, i);
+          }, reject);
+        } else {
+          changeArr(value, i);
+        }
+      }
+    });
+  }
+  static race(promises) {
+    return new Promise((resolve, reject) => {
+      for (let i = 0; i < promises.length; i++) {
+        const promise = promises[i];
+        Promise.resolve(promise)
+          .then((value) => resolve(value))
+          .catch((reason) => reject(reason));
+      }
+    });
+  }
 }
 
 function isPromise(val) {
@@ -183,29 +242,6 @@ function isPromise(val) {
   }
   return false;
 }
-
-Promise.all = function (values) {
-  return new Promise((resolve, reject) => {
-    let timers = 0;
-    let arr = [];
-    function changeArr(value, key) {
-      arr[key] = value;
-      if (++timers === values.length) {
-        resolve(arr);
-      }
-    }
-    for (let i = 0; i < values.length; i++) {
-      const value = values[i];
-      if (isPromise(value)) {
-        value.then((data) => {
-          changeArr(data, i);
-        }, reject);
-      } else {
-        changeArr(value, i);
-      }
-    }
-  });
-};
 
 Promise.deferred = function () {
   let dfd = {} as any;
