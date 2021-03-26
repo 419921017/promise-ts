@@ -224,9 +224,10 @@ class Promise {
     return new Promise((resolve, reject) => {
       for (let i = 0; i < promises.length; i++) {
         const promise = promises[i];
-        Promise.resolve(promise)
-          .then((value) => resolve(value))
-          .catch((reason) => reject(reason));
+        Promise.resolve(promise).then(
+          (value) => resolve(value),
+          (reason) => reject(reason)
+        );
       }
     });
   }

@@ -212,9 +212,7 @@ var Promise$1 = /** @class */ (function () {
         return new Promise(function (resolve, reject) {
             for (var i = 0; i < promises.length; i++) {
                 var promise = promises[i];
-                Promise.resolve(promise)
-                    .then(function (value) { return resolve(value); })
-                    .catch(function (reason) { return reject(reason); });
+                Promise.resolve(promise).then(function (value) { return resolve(value); }, function (reason) { return reject(reason); });
             }
         });
     };
