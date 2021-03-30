@@ -224,17 +224,17 @@ class Promise {
     return new Promise((resolve, reject) => {
       for (let i = 0; i < promises.length; i++) {
         const promise = promises[i];
-        if (isPromise(promise)) {
-          promise.then((data) => {
-            resolve(data);
-          }, reject);
-        } else {
-          resolve(promise);
-        }
-        // Promise.resolve(promise).then(
-        //   (value) => resolve(value),
-        //   (reason) => reject(reason)
-        // );
+        // if (isPromise(promise)) {
+        //   promise.then((data) => {
+        //     resolve(data);
+        //   }, reject);
+        // } else {
+        //   resolve(promise);
+        // }
+        Promise.resolve(promise).then(
+          (value) => resolve(value),
+          (reason) => reject(reason)
+        );
       }
     });
   }

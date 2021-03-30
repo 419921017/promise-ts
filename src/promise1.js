@@ -184,17 +184,12 @@ class Promise {
     return new Promise((resolve, reject) => {
       for (let i = 0; i < promises.length; i++) {
         const promise = promises[i];
-        if (
-          ((typeof promise === 'object' && promise !== null) ||
-            typeof promise === 'function') &&
-          typeof promise.then === 'function'
-        ) {
-          promise.then((data) => {
+        Promise.resolve(promise).then(
+          (data) => {
             resolve(data);
-          }, reject);
-        } else {
-          resolve(promise);
-        }
+          },
+          (reason) => reject(reason)
+        );
       }
     });
   }
